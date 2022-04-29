@@ -1,21 +1,127 @@
-# %% imports and definitions
-from matplotlib import gridspec
-from python_for_nustar.nu_core import set_mpl
+from typing import Optional
+from nu_utils import set_mpl
 set_mpl()
 import os
-from python_for_nustar.pyxspec_lib.definitions import plt, make_figure, create_dir, showmodel, xspec, Model, Fit, Plot, AllData, AllModels, np, pd, glob
-from python_for_nustar.pyxspec_lib.storage import Container, Storage
-Fit.query = "yes"
+import numpy as np
+import pandas as pd
+from glob import glob
+import matplotlib.pyplot as plt
+from matplotlib import gridspec
+import xspec
+from xspec import Model, Fit, Plot, AllData, AllModels,  Xset
+from storage import Container, Storage
+
+### (Py)Xspec settings ###
 AllData.clear()
+Xset.parallel.error = 20
+Xset.chatter = 5
+Fit.query = "yes"
 Plot.device = '/null'
-SPE_TIMEOUT = 30  # after this much seconds of fitting, the function would produce an error due to timeout
 
 
-def plot_spe_nu(Plot, ax_spe=None, ax_res=None, fig=None, label='',
-                min_sig=50, min_bin=50,
-                    color1 = 'C0',
-                    color2 = 'C1',
-                plotmode='eeufs', figname=None, residuals='rat'):
+
+def create_dir(dir: str):
+    """
+    create_dir creates a directory with given name. If exists, does nothing
+
+    Args:
+        dir (str): directory to create
+    """
+    os.system(f'mkdir -p {dir}')
+
+### displaying functions ###
+
+def make_figure(log: bool=True, residuals: str='rat'):
+
+    fig, [ax_spe, ax_ra] =  plt.subplots(nrows=2, ncols = 1, sharex = True, gridspec_kw = {'hspace':0, 'height_ratios': [2,1]}, figsize = (14,6)) # type: ignore
+
+    ax_ra.set_xlabel('E, keV')  # type: ignore
+    if residuals == 'rat':
+        ax_ra.axhline(1, color='k')  # type: ignore
+        ax_ra.set_ylabel('$data/model$')  # type: ignore
+    if residuals == 'del':
+        ax_ra.axhline(0, color='k')  # type: ignore
+        ax_ra.set_ylabel('$[data-model]/error$')  # type: ignore
+
+    ax_spe.set_ylabel(  # type: ignore
+        '$EF_E, keV^2 (phot cm^{-2} s^{-1} keV^{-1})$')  # for eeufs plots type: ignore
+    if log:
+        for ax in [ax_spe]:
+            ax.set_xscale('log')  # type: ignore
+            ax.set_yscale('log')  # type: ignore
+        ax_ra.set_yscale('linear')  # type: ignore
+
+    return fig, ax_spe, ax_ra
+
+
+def showmodel(m):
+    # stolen from https://github.com/evandromr/pyxspec_utils
+    """Print current model information
+        Display a formated view of current model information
+        such as the one produced by `model.show()` on pyXspec
+        or by `show par` on Xspec.
+        The errors are taken from the `xspec.Fit.error` calculation
+        if that was not performed errros will be zero.
+        Parameters
+        ----------
+        m: Xspec.Model
+            The model from which you want information
+        Returns
+        --------
+        Print output as a formated table
+        Example
+        --------
+        >>> import xspec
+        >>> import pyxspec_utils as pu
+        >>> m1 = xspec.Models("wabs(powerlaw+mekal)")
+        >>> pu.printmodel(m1)
+        Model: wabs(powerlaw + mekal)
+        P#   C#   Component    Parameter  Unit    Value        Errors
+        -------------------------------------------------------------
+        1    1    wabs         nH         10^22   1.0     (0.0 , 0.0)
+        2    2    powerlaw     PhoIndex           1.0     (0.0 , 0.0)
+        3    2    powerlaw     norm               1.0     (0.0 , 0.0)
+        4    3    mekal        kT         keV     1.0     (0.0 , 0.0)
+        5    3    mekal        nH         cm-3    1.0     (0.0 , 0.0)
+        6    3    mekal        Abundanc           1.0     (0.0 , 0.0)
+        7    3    mekal        Redshift           0.0     (0.0 , 0.0)
+        8    3    mekal        switch             1.0     (0.0 , 0.0)
+        9    3    mekal        norm               1.0     (0.0 , 0.0)
+    """
+    print("Model: {}".format(m.expression))
+    print()
+    print("{:4} {:4} {:12} {:10} {:7} {:15} {:12}".format("P#",
+                                                          "C#",
+                                                          "Component",
+                                                          "Parameter",
+                                                          "Unit",
+                                                          "Value",
+                                                          "Errors"))
+    print("--"*38)
+    pid = 1
+    for cid, component in enumerate(m.componentNames):
+        for parameter in eval("m.{}.parameterNames".format(component)):
+            u = eval("m.{}.{}.unit".format(component, parameter))
+            val = eval("m.{}.{}.values[0]".format(component, parameter))
+            err = eval("m.{}.{}.error[:2]".format(component, parameter))
+            print("{:<4} {:<4} {:<12} {:<10} {:<7} {:<10.5} \
+                   ({:<10.5}, {:<10.5})".format(pid, cid + 1, component,
+                                                parameter, u, val,
+                                                err[0], err[1]))
+            pid += 1
+
+
+def plot_spe_nu(Plot,
+    ax_spe: Optional[plt.Axes]=None,
+    ax_res: Optional[plt.Axes]=None,
+    fig: Optional[plt.Figure] = None,  # type: ignore
+    label:  str='',
+    min_sig=50, min_bin=50,
+    color1:  str = 'C0', color2:  str = 'C1',
+    plotmode:  str='eeufs',
+    figname=None, residuals: str='del'):
+
+
     ms = 5
     alpha = 0.4
     if ax_spe is None:
@@ -69,7 +175,7 @@ def plot_spe_nu(Plot, ax_spe=None, ax_res=None, fig=None, label='',
         if figname is not None:
             fig.savefig(figname)
 
-    return en, en_err,  data, data_err, model, rat, rat_err
+    return None
 
 def load_nu_spe(spe1: str, spe2: str, en_lo='4.', en_hi='79.'):
     AllData.clear()
@@ -88,7 +194,7 @@ def load_bin_spe(bin_num: str, en_lo='4.', en_hi='79.'):
     return load_nu_spe(spe1=spe1, spe2=spe2, en_lo=en_lo, en_hi=en_hi)
 
 
-# @timeout_decorator.timeout(SPE_TIMEOUT)
+
 def fit_spectra(model: xspec.model.Model,
                 prefix: str,  model_name: str,
                 dataset: str = 'spe_and_lc',
@@ -244,10 +350,11 @@ def fit_spectra(model: xspec.model.Model,
     return s
 
 
-def ph_res_param(ser,
-                 funct=lambda x: x,
-                 plot=1, ax=None, title='', colors=None,
-                 delta_limits=0.05, plot_relative=False,
+def ph_res_param(
+    ser,
+    funct=lambda x: x,
+    plot=1, ax=None, title='', colors=None,
+    delta_limits=0.05, plot_relative=False,
                  **plt_kwargs):
 
     def get_parr_array(ser, funct):

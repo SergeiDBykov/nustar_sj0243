@@ -1,22 +1,63 @@
-
-from python_for_nustar.nu_core import (
+from glob import glob
+from typing import Optional
+from warnings import warn
+from nu_utils import (
     np,
     plt,
     os,
     create_dir,
-    glob,
     fits,
-    pd,
     run_command,
     fit_efsearch_data,
     start_stop,
-    fits,
-    EfromPI,
-    ratio_error,
 )
 
-fpm = "FPM"
-modules = ["A", "B"]
+modules = ['A','B']
+
+
+
+### NuSTAR utilities functions
+
+def PIfromE(E):
+    """
+    PI channel number from energy
+    """
+    return (E - 1.6) / 0.04
+
+
+def EfromPI(PI):
+    """
+    energy from PI channel number
+    """
+    return PI * 0.04 + 1.6
+
+
+def scan_phase_resolved_products(n_phase: int):
+    """
+    scan_phase_resolved_products for a current path to phase resolved path, it creates a list of spectra and lightcurves  which one can iterate over every FMP and phase bin
+    used in obtaining phase-resolved spectra and lightcurves
+    Args:
+        n_phase (int): number of phase bins
+        prodpath (str, optional): product path for phase resolved stuff. Defaults to 'phase_resolved'.
+
+    Returns:
+        Tuple: list of light curves (original, bary and orbitally corrected), list of spectra and a function to return list of any combination in form bla-bla-bla_A_binX_sr.format
+    """
+    binnum = np.arange(1, n_phase + 1)
+
+    def propname(modes, bin, postfix):
+        return [f"phase_resolved_bin{bin}{mode}_sr.{postfix}" for mode in modes]
+
+    def propname_per_bin(modes, postfix):
+        return [propname(modes, bin, postfix) for bin in binnum]
+
+    lclist = propname_per_bin(["A", "B"], "lc")
+    lclist_bary = propname_per_bin(["A", "B"], "lc_bary")
+    lclistorb_corr = propname_per_bin(["A", "B"], "lc_bary_orb_corr")
+
+    spelist = propname_per_bin(["A", "B"], "pha")
+
+    return lclist, lclist_bary, lclistorb_corr, spelist, propname_per_bin
 
 
 class NustarObservation:
@@ -27,7 +68,6 @@ class NustarObservation:
         Args:
             ObsID (str): ObsID of NuSTAR observation
             nu_path (str): path to nustar data of a particular source (e.g. /Users/sdbykov/work/xray_pulsars/groj2058_nu/)
-            obs_params (dict): dictionary of orbital parameters used for orbital correction
         """
 
         print("###")
@@ -45,7 +85,7 @@ class NustarObservation:
         self.products_path = os.getcwd()
 
 
-###### NUPIPELINE ########
+    ### NUPIPELINE ###
 
     def nupipeline(self, ObsList_bright: list):
         """
@@ -67,7 +107,8 @@ class NustarObservation:
 
     def make_regions(self):
         """
-        make_regions creates a ds9 script which plots images from modules and you can easily set and check region positions for source and background estimation
+        make_regions creates a ds9 script which plots images from modules and you can easily set and check region positions for source and background estimation.
+        Regions should be  set by hand!!!
         """
 
         ds9_set = f"ds9 -tile nu{self.ObsID}A01_cl.evt -scale log  -tile nu{self.ObsID}B01_cl.evt  -scale log -lock scale"
@@ -77,7 +118,7 @@ class NustarObservation:
 
         run_command(cmd=ds9_check, cmd_name="ds9_check")
 
-    ## NUPRODUCTS ########
+    ### NUPRODUCTS ###
 
     def nuproducts(
         self,
@@ -119,9 +160,11 @@ class NustarObservation:
             imagefile (str, optional): nuproducts argument. Defaults to 'DEFAULT'.
             pilow (str, optional): nuproducts argument. Defaults to '60'.
             pihigh (str, optional): nuproducts argument. Defaults to '1935'.
+            lcenergy (str, optional): nuproducts argument. Defaults to '10'.
             binsize ( , optional): nuproducts argument. Defaults to 0.01.
             usrgtifile (str, optional): nuproducts argument. Defaults to 'NONE'.
             usrgtibarycorr (str, optional): nuproducts argument. Defaults to 'no'.
+            rewrite (bool, optional): whether to rewrite existing .sh file. Defaults to True.
 
         """
 
@@ -140,7 +183,7 @@ class NustarObservation:
         nuproducts = f"""
     nuproducts \
     indir={self.out_path} \
-    instrument={fpm}{mode} \
+    instrument=FPM{mode} \
     steminputs=nu{ObsID} \
     stemout={stemout} \
     outdir={outdi} \
@@ -187,7 +230,7 @@ class NustarObservation:
             grppha = f"""grppha infile="{infile}" outfile="{outfile}"  comm="group min {group_min} & exit" clobber=yes"""
             run_command(cmd=grppha, cmd_name="grppha", rewrite=False)
 
-    ##### LIGHT CURVES ######
+    ### LIGHT CURVES ###
 
     def make_lc(self, **kwargs):
         """
@@ -208,17 +251,17 @@ class NustarObservation:
         prodpath: str,
         barytime: str = "no",
         cmd_name: str = "barycorr",
-        rewrite=0,
+        rewrite=False,
     ):
         """
-        barycorr applies barycorr to input file. NOTE: Ra and Dec of the source are readed from fits file. If you need, you may add keywords ra, dec to barocorr command belowself.
+        barycorr applies barycorr to input file. NOTE: Ra and Dec of the source are readed from fits file. If you need, you may add keywords ra, dec to barycorr command below.
 
         Args:
-            infile (List): input file names
+            infiles (List): input file names
             prodpath (str): path to products whene file lies
             barytime (str, optional): Argument of barycor ftools task. Defaults to 'no'.
-            cmd_name (str, optional): command name. Defaults to 'lcmath'.
-            rewrite (bool, optional): whether to rewrit. Defaults to True.
+            cmd_name (str, optional): command name. Defaults to 'barycorr'.
+            rewrite (bool, optional): whether to rewrite. Defaults to False.
 
         """
         os.chdir(self.products_path + "/" + prodpath)
@@ -240,7 +283,7 @@ class NustarObservation:
         rewrite: bool = True,
     ):
         """
-        lcmath creates a script for running lcmath ftools routine to AVERAGEE two input lightcurves
+        lcmath creates a script for running lcmath ftools routine to AVERAGE two input lightcurves
 
         Args:
             infiles (List): list of two lightcurvs to average
@@ -272,20 +315,19 @@ class NustarObservation:
         would take a lot of time
 
         Args:
-            filename (str): filename of a lighcurve to be corrected
+            filename (str): filename of a lighcurve to be corrected, should be barycentred
             prodpath (str): path to lightcurve product folder
         """
+        if 'bary' not in filename:
+            raise ValueError("lightcurve file should be barycentred")
 
         os.chdir(self.products_path + "/" + prodpath)
-
-        #doppler_correction.correct_times(  # type: ignore
-        #    fitsfile=filename, orb_params=None, time_orig_col="time"
-        #)
+        warn('Oorbital correction is not implemented, using barycorreted lighcurve instead')
         filename_path, filename_only = filename.rsplit('/', 1)
         new_filename = filename_path+'/'+filename_only+'_orb_corr'
         os.system(f'cp {filename} {new_filename}')
 
-    ##### PERIOD SEARCH AND EPOCH FOLDING ######
+    ### PERIOD SEARCH AND EPOCH FOLDING ###
 
     def make_efsearch(
         self,
@@ -302,15 +344,14 @@ class NustarObservation:
         make_efsearch creates a script for running eefsearch for a given light curve
 
         Args:
-            filename (str): filename of a light curve (barycentred)
-            prodpath (str): [description]
+            filename (str): filename of a light curve (barycentred or orbitally-corrected)
+            prodpath (str): path to light curves
             p0 (str): efsearch argument
             nphase (str, optional): efsearch argument. Defaults to '8'.
             dres (str, optional): efsearch argument. Defaults to '0.001'.
             nper (str, optional): efsearch argument. Defaults to '128'.
-            prodpath (str): path to light curves
-            cmd_name (str, optional): command name. Defaults to 'lcmath'.
-            rewrite (bool, optional): whether to rewrit. Defaults to True.
+            cmd_name (str, optional): command name. Defaults to 'efsearch'.
+            rewrite (bool, optional): whether to rewrite. Defaults to True.
 
         """
         os.chdir(self.products_path + "/" + prodpath)
@@ -333,7 +374,7 @@ class NustarObservation:
 
     def fit_efsearch(self, filename: str, prodpath: str):
         """
-        fit_efsearch fits efsearch file
+        fit_efsearch fits efsearch file to find  period
 
         Args:
             filename (str): filename
@@ -353,12 +394,12 @@ class NustarObservation:
         rewrite=True,
     ):
         """
-        make_efold makes efold script to fold loghtcurves with given period
+        make_efold makes efold script to fold lightcurves with a given period
 
         Args:
             filename (str): name of a lc
             prodpath (str): path to an lc
-            period (str): period to fold with
+            period (str): period to fold with, in seconds
             nphase (str, optional): number of phases. Defaults to '32'.
             cmd_name (str, optional): name of the command. Defaults to 'efold'.
             rewrite (bool, optional): whether to rewrite command file. Defaults to True.
@@ -383,7 +424,7 @@ class NustarObservation:
 
         run_command(efold, cmd_name=cmd_name, rewrite=rewrite)
 
-    ###### PHASE RESOLVED SPECTRA AND GTIs #####
+    ### PHASE RESOLVED SPECTRA AND GTIs ###
 
     def make_gti_from_lc(
         self,
@@ -398,10 +439,8 @@ class NustarObservation:
         make_gti_from_lc
         This task uses BARYCENTRED AND ORBIRALLY CORRECTED LIGHTCURVES to produce GTI with given period and timebins.
         Al long as original lc was barycorrected to different file,
-        and this barycentred file was used to produce Orbital correction(see above),
-        we juxtapose times from corected LC(TBD time) and original
-        LC(times starts with zero). Timezero for the lightcurve is a time of
-        the first event in an event file(hence we use time of original lc + timezero)
+        and this barycentred file was used to produce Orbital correction(see above), we juxtapose times from corected LC(TBD time) and original LC(times starts with zero). 
+        Timezero for the lightcurve is a time of the first event in an event file(hence we use time of original lc + timezero)
 
         Args:
             prodpath (str): path to light curve file from which GTIs are built
@@ -409,7 +448,7 @@ class NustarObservation:
             period (float): period for gti
             phase_bins (int, optional): number of phases. Defaults to 10.
             outfolder (str, optional): output folder for GTIs. Defaults to 'gtis/'.
-            half_shift (int, optional): number of half bin size shifts to apply to zero time, If 0, makes no shift and starts with the first bin time as zero-time. Defaults to 0. Example:  If half_shift = 1, the bin that prebiously started at phi = 0.5, would start at phi = 0.5 - (phase_bin_width)/2
+            half_shift (int, optional): number of half bin size shifts to apply to zero time, If 0, makes no shift and starts with the first bin time as zero-time. Defaults to 0. Example:  If half_shift = 1, the bin that previously started at phi = 0.5, would start at phi = 0.5 - (phase_bin_width)/2
 
         """
 
@@ -486,7 +525,7 @@ class NustarObservation:
         # Plotting phase assigned-lightcurve. Need to check this plot before extracting products
         fig, [ax1, ax2] = plt.subplots(2, sharex=True)  # type: ignore
 
-        ind_max = int(3500)
+        ind_max = int(3500)  #first ind_max points are used to plot phases
         ax1.plot(time_orig[:ind_max], phases[:ind_max])
         ax1.set_xlabel("original time column")
         ax1.set_ylabel("phase of a light curve bin")
@@ -517,7 +556,7 @@ class NustarObservation:
             gtipath (str, optional): path to GTI files. Defaults to 'spe_and_lc/gtis'.
             folder (str, optional): folder when nuproduct will unpack spectra and lightcurves. Defaults to 'phase_resolved'.
 
-        CHECK TERMINAL FOR ERRORS IN NUPRODUCTS (search 'nuproducts  error' in terminal window and relaunch problematic phase bins, having deleted beforehand all products created before error). I do not know why errors sometimes arrise, probably due to the conflicts in naming of temporal files and folders while I launch phase resolved for A and B modules in parallel terminal windows. When I launch phase-resolved products for FPMA and only after that FPMB, the errors do not appear (e.g. $ ./phase_resolvedA.sh; ./phase_resolvedB.sh ).
+        CHECK TERMINAL FOR ERRORS IN NUPRODUCTS (search 'nuproducts  error' in terminal window and relaunch problematic phase bins, having deleted beforehand all products created before error). I do not know why errors sometimes arise, probably due to the conflicts in naming of temporal files and folders while I launch phase resolved for A and B modules in parallel terminal windows. When I launch phase-resolved products for FPMA and only after that FPMB, the errors do not appear (e.g. $ ./phase_resolvedA.sh; ./phase_resolvedB.sh ).
 
         The time it takes for one phase bin depends on the observation duration and on the lightcurve binning. It may take a few minutes per phase bin (lc+spe).
         """
@@ -544,7 +583,7 @@ class NustarObservation:
             raise Exception("Stop phase resolved spectroscopy")
 
         for ph_num, gtifile in enumerate(gtis, 1):
-            # usrgtibarycorr = no in the next line is very important!!!
+            # !!!  usrgtibarycorr = no  is very important!!!
             self.nuproducts(
                 outdir=folder,
                 usrgtifile=gtifile,
@@ -554,36 +593,31 @@ class NustarObservation:
                 rewrite=False,
             )
 
-    def check_efold_of_bins(
+    def plot_efolds_of_bins(
         self,
-        fiducial: str,
-        efolds_files: list,
-        phase_zero_efold=None,
+        efolds_files: Optional[list],
+        phase_zero_efold_file: Optional[str] =None,
         prodpath: str = "phase_resolved",
         ax_efold=None,
         fig=None,
-        save=True,
-        legend=True,
+        save: bool=True,
+        legend: bool=True,
     ):
+        #check_efold_of_bins builds period-folded lightcurves for each phase bin and compares with the folded lightcurve of the whole observation if necessary
         """
-        check_efold_of_bins builds period-folded lightcurves for each phase bin and compares with the folded lightcurve of the whole observation if necessary.
+        plot_efolds_of_bins _summary_
 
         Args:
-            fiducial (str): efold fits file of the whole observation
-            efolds_files (list): efold fits files of phase bins to plot
-            prodpath (str, optional): path to phase-resolved products. Defaults to 'phase_resolved'.
+            efolds_files (Optional[list]): files to plot pulse prfiles from
+            phase_zero_efold_file (Optional[str], optional): file which be deem as the first bin. Defaults to None.
+            prodpath (str, optional): path to phase-resolved products. Defaults to "phase_resolved".
+            ax_efold (optional): axis to plot on. Defaults to None.
+            fig (optional): figure to plot on. Defaults to None.
+            save (bool, optional): whether to save the figure. Defaults to True.
+            legend (bool, optional): whether to show legend. Defaults to True.
 
-        This is how to create a plot of RATIO between phase-bins efilds and fiducial lightcurve
-        f0 = fits.open('../spe_and_lc/spe_and_lcAB_sr.lc_bary_orb_corr_nphase_128.efold')
-        fig,ax = plt.subplots()
-
-        for binnum in np.arange(1,11):
-            fbin = fits.open(f'phase_resolved_bin{binnum}AB_sr.lc_bary_orb_corr_nphase_128.efold')
-            ax.plot(f0[1].data['PHASE'], fbin[1].data['RATE1']/f0[1].data['RATE1'], label = binnum)
-
-        ax.legend()
-
-
+        Returns:
+            returns a figure and a sequence of colors for each phase bin.
         """
         os.chdir(self.products_path + "/" + prodpath)
 
@@ -599,51 +633,20 @@ class NustarObservation:
         else:
             pass
 
-        if phase_zero_efold is None:
+        if phase_zero_efold_file is None:
             ph_shift = 0
         else:
-            ff_zero = fits.open(phase_zero_efold)
+            ff_zero = fits.open(phase_zero_efold_file)
             phase_zero = ff_zero[1].data["PHASE"]
             rate_zero = ff_zero[1].data["RATE1"]
             idx = np.where(~np.isnan(rate_zero))[0][0]
             ph_shift = phase_zero[idx] * (-1)
             # print(f'#### PHASE SHIFT  =  {ph_shift}')
-        if fiducial is not None:
-            for fitsfile in [fiducial]:
-                pulse_profile = fits.open(fitsfile)[1].data  # type: ignore
-                phase = pulse_profile["PHASE"] + ph_shift
-                rate = pulse_profile["RATE1"]
-                error = pulse_profile["ERROR1"]
-                color = "k"
-                ax_efold.errorbar(
-                    phase,
-                    rate,
-                    error,
-                    drawstyle="steps-mid",
-                    ls="-.",
-                    alpha=0.3,
-                    lw=5,
-                    label="ref",
-                    color=color,
-                    ecolor=color,
-                )
-                ax_efold.errorbar(
-                    phase + 1,
-                    rate,
-                    error,
-                    drawstyle="steps-mid",
-                    ls="-.",
-                    alpha=0.3,
-                    lw=5,
-                    color=color,
-                    ecolor=color,
-                )
-                ymin, ymax = 0.9 * np.min(rate), np.max(rate) * 1.1
-        else:
-            pass
+
         colors = []
+        if efolds_files is None:
+            efolds_files = glob("*A_bin_*sr.lc")
         for fitsfile in efolds_files:
-            # print(f'working with {fitsfile}')
             binnum = fitsfile.split("_")[2]
             pulse_profile = fits.open(fitsfile)[1].data  # type: ignore
             phase = pulse_profile["PHASE"] + ph_shift
@@ -654,13 +657,6 @@ class NustarObservation:
                 phase, rate, error, drawstyle="steps-mid", ls="-", alpha=0.8, lw=3
             )
 
-            # mean_phase = 0.9*np.median(phase[rate > 0])
-
-            # binnum_numeral = binnum[3:-2]
-            # ax_efold.text(mean_phase, 0.7*np.min(
-            #     rate[rate > 0]), s=binnum_numeral, fontsize=6, bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
-            # ax_efold.text(mean_phase+1, 0.7*np.min(
-            #     rate[rate > 0]), s=binnum_numeral, fontsize=6, bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
 
             color = ax_efold.get_lines()[-1].get_color()
             colors.append(color)
@@ -668,22 +664,7 @@ class NustarObservation:
                 ax_efold.fill_between(
                     phase + dph, 0, rate, fc=color, alpha=0.4, ec="k", label=f"{binnum}"
                 )
-
-            # if binnum == "bin1AB":
-            #     for dph in [-2, -1, 0, 1, 2]:
-            #         ax_efold.fill_between(
-            #             phase + dph,
-            #             0,
-            #             rate,
-            #             fc=color,
-            #             alpha=0.4,
-            #             ec="k",
-            #             label=f"{binnum}",
-            #             hatch="X",
-            #         )
-
-            for dph in [-2, -1, 0, 1, 2]:
-
+                
                 ax_efold.errorbar(
                     phase + dph,
                     rate,
@@ -701,94 +682,8 @@ class NustarObservation:
         ax_efold.set_xlabel("Phase")
         ax_efold.set_ylabel("Rate")
         ax_efold.set_xlim(-0.1, 2.1)
-        if fiducial is not None:
-            ax_efold.set_ylim(ymin, ymax)  # type: ignore
+        ax_efold.relim()  # type: ignore
         fig.tight_layout()
         if save:
-            fig.savefig("efold_check.png")
+            fig.savefig("efold.png")
         return fig, colors
-
-    def check_lightcurve_of_bins(
-        self, fiducial: str, lc_files: list, prodpath: str = "phase_resolved"
-    ):
-        """
-        check_lightcurve_of_bins builds  lightcurves for each phase bin and compares with the  lightcurve of the whole observation if necessary.
-
-        Args:
-            fiducial (str): light curve fits file of the whole observation
-            efolds_files (list): light curve fits files of phase bins to plot
-            prodpath (str, optional): path to phase-resolved products. Defaults to 'phase_resolved'.
-
-        This is how to create a plot of RATIO between light curves and fiducial lightcurve
-        f0 = fits.open('../spe_and_lc/spe_and_lcAB_sr.lc_bary_orb_corr_nphase_128.efold')
-        fig,ax = plt.subplots()
-
-        for binnum in np.arange(1,11):
-            fbin = fits.open(f'phase_resolved_bin{binnum}AB_sr.lc_bary_orb_corr_nphase_128.efold')
-            ax.plot(f0[1].data['PHASE'], fbin[1].data['RATE1']/f0[1].data['RATE1'], label = binnum)
-
-        ax.legend()
-
-
-        """
-        ind_max = int(1e3)
-        os.chdir(self.products_path + "/" + prodpath)
-
-        assert len(glob("*A_bin_*sr.pha")) == len(
-            glob("*B_bin_*sr.pha")
-        ), "different number of spectra files for mode A and B"
-        assert len(glob("*A_bin_*sr.lc")) == len(
-            glob("*B_bin_*sr.lc")
-        ), "different number of light curve files for mode A and B"
-
-        fig, ax_lc = plt.subplots(figsize=(16, 5))
-
-        if fiducial is not None:
-            for fitsfile in [fiducial]:
-                light_curve = fits.open(fitsfile)[1].data  # type: ignore
-                time = light_curve["TIME"]
-                rate = light_curve["RATE"]
-                error = light_curve["ERROR"]
-                color = "k"
-                ax_lc.errorbar(
-                    time[: ind_max * (len(lc_files) + 2)],
-                    rate[: ind_max * (len(lc_files) + 2)],
-                    error[: ind_max * (len(lc_files) + 2)],
-                    ls="-.",
-                    alpha=0.2,
-                    lw=10,
-                    label="ref",
-                    color=color,
-                    ecolor=color,
-                )
-
-        else:
-            pass
-
-        for fitsfile in lc_files:
-            print(f"working with {fitsfile}")
-            binnum = fitsfile.split("_")[2]
-            light_curve = fits.open(fitsfile)[1].data  # type: ignore
-            time = light_curve["TIME"]
-            rate = light_curve["RATE"]
-            error = light_curve["ERROR"]
-
-            ax_lc.errorbar(
-                time[:ind_max],
-                rate[:ind_max],
-                error[:ind_max],
-                ls="-",
-                alpha=0.8,
-                lw=3,
-                label=binnum,
-            )
-
-            # color = ax_lc.get_lines()[-1].get_color()
-            # ax_lc.fill_between(
-            #    time[:ind_max], 0, rate[:ind_max], fc=color, alpha=0.4, ec='k', label=f"{binnum}")
-
-        ax_lc.legend()
-        ax_lc.set_xlabel("Time")
-        ax_lc.set_ylabel("Rate")
-        fig.tight_layout()
-        fig.savefig("lc_check.png")

@@ -186,3 +186,5 @@ Thumbs.db
 #for vscode
 workspace.code-workspace
 .vscode
+
+data_analysis/junk
