@@ -1,7 +1,7 @@
 from glob import glob
 from typing import Optional
 from warnings import warn
-from nu_utils import (
+from .nu_utils import (
     np,
     plt,
     os,
@@ -67,14 +67,14 @@ class NustarObservation:
 
         Args:
             ObsID (str): ObsID of NuSTAR observation
-            nu_path (str): path to nustar data of a particular source (e.g. /Users/sdbykov/work/xray_pulsars/groj2058_nu/)
+            nu_path (str): path to nustar data of a particular source (e.g. in my case /Users/sdbykov/work/xray_pulsars/groj2058_nu/)
         """
 
         print("###")
         print(f"Observation {ObsID} loaded successfully")
         self.ObsID = ObsID
-        self.data_path = nu_path + "data/" + ObsID + "/"
-        os.chdir(nu_path + "results/")
+        self.data_path = nu_path + "nustar_data/" + ObsID + "/"
+        os.chdir(nu_path + "nustar_products/")
 
         create_dir("out" + self.ObsID)
         os.chdir("out" + ObsID)
@@ -225,10 +225,10 @@ class NustarObservation:
         """
 
         os.chdir(self.products_path + "/" + prodpath)
-        for infile in infiles:
+        for i, infile in enumerate(infiles):
             outfile = infile[0:-4] + ".pi"
             grppha = f"""grppha infile="{infile}" outfile="{outfile}"  comm="group min {group_min} & exit" clobber=yes"""
-            run_command(cmd=grppha, cmd_name="grppha", rewrite=False)
+            run_command(cmd=grppha, cmd_name="grppha", rewrite=i==0)
 
     ### LIGHT CURVES ###
 
@@ -265,14 +265,14 @@ class NustarObservation:
 
         """
         os.chdir(self.products_path + "/" + prodpath)
-        for infile in infiles:
+        for i, infile in enumerate(infiles):
             outfile = infile + "_bary"
             barycorr = f"""      barycorr \
         infile={infile} \
         outfile={outfile}\
         orbitfiles={self.data_path}auxil/nu{self.ObsID}_orb.fits.gz\
         barytime={barytime} """
-            run_command(barycorr, cmd_name=cmd_name, rewrite=rewrite)
+            run_command(barycorr, cmd_name=cmd_name, rewrite=rewrite+i==0)
 
     def lcmath(
         self,

@@ -188,3 +188,5 @@ workspace.code-workspace
 .vscode
 
 data_analysis/junk
+nustar_data/90201041002
+nustar_products/*

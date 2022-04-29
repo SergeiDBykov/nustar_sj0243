@@ -1,5 +1,5 @@
 from typing import Optional
-from nu_utils import set_mpl
+from .nu_utils import set_mpl
 set_mpl()
 import os
 import numpy as np
