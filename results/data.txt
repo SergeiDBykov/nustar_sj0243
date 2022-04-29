@@ -1,0 +1,1 @@
+folders with products will appear here after running pipeline
