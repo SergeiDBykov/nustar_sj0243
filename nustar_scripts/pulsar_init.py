@@ -1,3 +1,4 @@
+
 Nu_path = "/Users/sdbykov/work/xray_pulsars/nustar_sj0243/"
 analysis_path = Nu_path+"nustar_products/results/"
 plot_path = Nu_path+'data_analysis/final_results/figures_tables/' 
@@ -11,8 +12,7 @@ ObsList = [
     "90401334002",
     "90501310002",
 ]  
-
-ObsList = ['90201041002']
+#90201041002
 
 ObsList_bright = [
     "90302319002",

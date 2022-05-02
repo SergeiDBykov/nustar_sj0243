@@ -381,8 +381,8 @@ class NustarObservation:
             prodpath (str): path to file
         """
         os.chdir(self.products_path + "/" + prodpath)
-        per, err = fit_efsearch_data(filename + ".efs")
-        return per, err
+        per, err, p_maxchi = fit_efsearch_data(filename + ".efs")
+        return per, err, p_maxchi
 
     def make_efold(
         self,
@@ -423,6 +423,40 @@ class NustarObservation:
             outfile = {filename}_nphase_{nphase}.efold"""
 
         run_command(efold, cmd_name=cmd_name, rewrite=rewrite)
+
+    def plot_efold(self, filename: str, prodpath: str):
+        """
+        plot_efold plots folded lightcurve
+
+        Args:
+            filename (str): name of a lc
+            prodpath (str): path to an lc
+        """
+        os.chdir(self.products_path + "/" + prodpath)
+        with fits.open(filename + ".efold") as f:
+            ph, rate, err = f[1].data['PHASE'],  f[1].data['RATE1'],  f[1].data['ERROR1']
+            roll_idx = -np.argmin(rate)
+
+            rate = np.roll(rate, roll_idx)
+            err = np.roll(err, roll_idx)
+
+            rate = np.tile(rate, 2)
+            err = np.tile(err, 2)
+            ph = np.hstack((ph, ph+1))
+
+            factor = np.mean(rate)
+            rate = rate/factor
+            err = err/factor
+
+            fig,  ax =  plt.subplots( figsize = (12,8))
+            ax.step(ph, rate, where='mid', label=self.ObsID)
+            color =  ax.get_lines()[-1].get_color()
+            ax.errorbar(ph, rate, err, fmt = 'none', color= color, ms = 10, alpha = 0.7)
+            ax.set_title(self.ObsID)
+            plt.show()
+        return fig
+
+
 
     ### PHASE RESOLVED SPECTRA AND GTIs ###
 
@@ -592,6 +626,8 @@ class NustarObservation:
                 usrgtibarycorr="no",
                 rewrite=False,
             )
+
+
 
     def plot_efolds_of_bins(
         self,
