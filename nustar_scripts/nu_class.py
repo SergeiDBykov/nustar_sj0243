@@ -1,4 +1,5 @@
 from glob import glob
+import sys
 from typing import Optional
 from warnings import warn
 from .nu_utils import (
@@ -502,7 +503,7 @@ class NustarObservation:
 
         create_dir(outfolder)
         filename_orig = glob(f"*{mode}_sr.lc")[0]
-        filename_corr = glob(f"*{mode}_sr.lc_bary_orb_corr")[0]
+        filename_corr = glob(f"*{mode}_sr.lc_bary")[0]
 
         ff_orig = fits.open(filename_orig)
         time_orig = ff_orig[1].data["time"]  # type: ignore
@@ -548,18 +549,19 @@ class NustarObservation:
             else:
                 hdulist.writeto(outfolder + f"gti_{ii}{mode}.fits")
             hdulist.close()
-            print(
-                f"GTIs have been created for module(s) {mode} with period {period} and {phase_bins} bins, phase bin number {ii}"
-            )
+            #print(
+            #    f"GTIs have been created for module(s) {mode} with period {period} and {phase_bins} bins, phase bin number {ii}"
+            #)
 
         print(
             f"GTIs have been created for module(s) {mode} with period {period} and {phase_bins} bins"
         )
 
         # Plotting phase assigned-lightcurve. Need to check this plot before extracting products
-        fig, [ax1, ax2] = plt.subplots(2, sharex=True)  # type: ignore
+        fig, [ax1, ax2] = plt.subplots(2, sharex=True, figsize  = (12,12))  # type: ignore
 
-        ind_max = int(3500)  #first ind_max points are used to plot phases
+        bin_size = np.diff(time_orig)[0]
+        ind_max = int(float(period) / bin_size * 1.5)
         ax1.plot(time_orig[:ind_max], phases[:ind_max])
         ax1.set_xlabel("original time column")
         ax1.set_ylabel("phase of a light curve bin")
@@ -575,6 +577,7 @@ class NustarObservation:
         # fig.colorbar(sc, ax=ax2)
         ax2.set_xlabel("original time column")
         ax2.set_ylabel("count rate with color as  phase coding")
+        plt.show()
 
     def phase_resolved_spectra(
         self,
@@ -595,6 +598,7 @@ class NustarObservation:
         The time it takes for one phase bin depends on the observation duration and on the lightcurve binning. It may take a few minutes per phase bin (lc+spe).
         """
         os.chdir(self.products_path)
+        os.system(f"rm -f {folder}{mode}.sh") #remove previous script if any
         create_dir(folder)
         gtipath = os.path.abspath(gtipath)
         gtis = glob(f"{gtipath}/*{mode}.fits")
@@ -616,6 +620,8 @@ class NustarObservation:
         else:
             raise Exception("Stop phase resolved spectroscopy")
 
+        print('start  phase resolved spectra scripts')
+        
         for ph_num, gtifile in enumerate(gtis, 1):
             # !!!  usrgtibarycorr = no  is very important!!!
             self.nuproducts(
@@ -626,6 +632,7 @@ class NustarObservation:
                 usrgtibarycorr="no",
                 rewrite=False,
             )
+        print('done with phase resolved spectra scripts')
 
 
 
