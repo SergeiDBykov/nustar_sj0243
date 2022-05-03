@@ -33,7 +33,7 @@ def EfromPI(PI):
     return PI * 0.04 + 1.6
 
 
-def scan_phase_resolved_products(n_phase: int):
+def scan_phase_resolved_products(prodpath:str = 'phase_resolved',n_phase: int=10):
     """
     scan_phase_resolved_products for a current path to phase resolved path, it creates a list of spectra and lightcurves  which one can iterate over every FMP and phase bin
     used in obtaining phase-resolved spectra and lightcurves
@@ -47,18 +47,20 @@ def scan_phase_resolved_products(n_phase: int):
     binnum = np.arange(1, n_phase + 1)
 
     def propname(modes, bin, postfix):
-        return [f"phase_resolved_bin{bin}{mode}_sr.{postfix}" for mode in modes]
+        if len(modes) == 1:
+            return f"{prodpath}_bin{bin}{modes[0]}_sr.{postfix}"
+        else:
+            return [f"{prodpath}_bin{bin}{mode}_sr.{postfix}" for mode in modes]
 
     def propname_per_bin(modes, postfix):
         return [propname(modes, bin, postfix) for bin in binnum]
 
     lclist = propname_per_bin(["A", "B"], "lc")
     lclist_bary = propname_per_bin(["A", "B"], "lc_bary")
-    lclistorb_corr = propname_per_bin(["A", "B"], "lc_bary_orb_corr")
 
     spelist = propname_per_bin(["A", "B"], "pha")
 
-    return lclist, lclist_bary, lclistorb_corr, spelist, propname_per_bin
+    return lclist, lclist_bary, spelist, propname_per_bin
 
 
 class NustarObservation:
@@ -644,7 +646,7 @@ class NustarObservation:
         ax_efold=None,
         fig=None,
         save: bool=True,
-        legend: bool=True,
+        legend: bool=False,
     ):
         #check_efold_of_bins builds period-folded lightcurves for each phase bin and compares with the folded lightcurve of the whole observation if necessary
         """
@@ -727,6 +729,7 @@ class NustarObservation:
         ax_efold.set_xlim(-0.1, 2.1)
         ax_efold.relim()  # type: ignore
         fig.tight_layout()
+        plt.show()
         if save:
             fig.savefig("efold.png")
         return fig, colors

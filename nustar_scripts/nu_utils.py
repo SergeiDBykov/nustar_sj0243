@@ -104,8 +104,8 @@ def run_command(cmd: str, cmd_name: str, rewrite: bool = True) -> str:
     Returns:
         str: path to command
     """
-    print("Creating command command:", cmd)
-    print("Writing to file: ", cmd_name)
+    #print("Creating command command:", cmd)
+    print("Writing to file: ", cmd_name+'.sh')
 
     if rewrite:
         os.system(f"rm -f {cmd_name}.sh")
