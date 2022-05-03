@@ -1,5 +1,7 @@
-from typing import Optional
-from .nu_utils import set_mpl
+from typing import Optional, Tuple
+
+from nustar_scripts.nu_class import NustarObservation
+from .nu_utils import set_mpl, create_dir
 set_mpl()
 import os
 import numpy as np
@@ -9,7 +11,10 @@ import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import xspec
 from xspec import Model, Fit, Plot, AllData, AllModels,  Xset
-from storage import Container, Storage
+from .storage import Container, Storage
+from typing import Optional
+
+
 
 ### (Py)Xspec settings ###
 AllData.clear()
@@ -19,43 +24,31 @@ Fit.query = "yes"
 Plot.device = '/null'
 
 
-
-def create_dir(dir: str):
-    """
-    create_dir creates a directory with given name. If exists, does nothing
-
-    Args:
-        dir (str): directory to create
-    """
-    os.system(f'mkdir -p {dir}')
-
 ### displaying functions ###
 
-def make_figure(log: bool=True, residuals: str='rat'):
+def make_figure():
+    """Make a figure with a grid of subplots for plotting spectra in eeufs format"""
 
     fig, [ax_spe, ax_ra] =  plt.subplots(nrows=2, ncols = 1, sharex = True, gridspec_kw = {'hspace':0, 'height_ratios': [2,1]}, figsize = (14,6)) # type: ignore
 
     ax_ra.set_xlabel('E, keV')  # type: ignore
-    if residuals == 'rat':
-        ax_ra.axhline(1, color='k')  # type: ignore
-        ax_ra.set_ylabel('$data/model$')  # type: ignore
-    if residuals == 'del':
-        ax_ra.axhline(0, color='k')  # type: ignore
-        ax_ra.set_ylabel('$[data-model]/error$')  # type: ignore
+
+    ax_ra.axhline(0, color='k')  # type: ignore
+    ax_ra.set_ylabel('$[data-model]/error$')  # type: ignore
 
     ax_spe.set_ylabel(  # type: ignore
         '$EF_E, keV^2 (phot cm^{-2} s^{-1} keV^{-1})$')  # for eeufs plots type: ignore
-    if log:
-        for ax in [ax_spe]:
-            ax.set_xscale('log')  # type: ignore
-            ax.set_yscale('log')  # type: ignore
-        ax_ra.set_yscale('linear')  # type: ignore
+
+    for ax in [ax_spe]:
+        ax.set_xscale('log')  # type: ignore
+        ax.set_yscale('log')  # type: ignore
+    ax_ra.set_yscale('linear')  # type: ignore
 
     return fig, ax_spe, ax_ra
 
 
 def showmodel(m):
-    # stolen from https://github.com/evandromr/pyxspec_utils
+    # stolen blatantly from https://github.com/evandromr/pyxspec_utils
     """Print current model information
         Display a formated view of current model information
         such as the one produced by `model.show()` on pyXspec
@@ -69,24 +62,7 @@ def showmodel(m):
         Returns
         --------
         Print output as a formated table
-        Example
-        --------
-        >>> import xspec
-        >>> import pyxspec_utils as pu
-        >>> m1 = xspec.Models("wabs(powerlaw+mekal)")
-        >>> pu.printmodel(m1)
-        Model: wabs(powerlaw + mekal)
-        P#   C#   Component    Parameter  Unit    Value        Errors
-        -------------------------------------------------------------
-        1    1    wabs         nH         10^22   1.0     (0.0 , 0.0)
-        2    2    powerlaw     PhoIndex           1.0     (0.0 , 0.0)
-        3    2    powerlaw     norm               1.0     (0.0 , 0.0)
-        4    3    mekal        kT         keV     1.0     (0.0 , 0.0)
-        5    3    mekal        nH         cm-3    1.0     (0.0 , 0.0)
-        6    3    mekal        Abundanc           1.0     (0.0 , 0.0)
-        7    3    mekal        Redshift           0.0     (0.0 , 0.0)
-        8    3    mekal        switch             1.0     (0.0 , 0.0)
-        9    3    mekal        norm               1.0     (0.0 , 0.0)
+
     """
     print("Model: {}".format(m.expression))
     print()
@@ -116,16 +92,17 @@ def plot_spe_nu(Plot,
     ax_res: Optional[plt.Axes]=None,
     fig: Optional[plt.Figure] = None,  # type: ignore
     label:  str='',
-    min_sig=50, min_bin=50,
+    min_sig: str='50', min_bin: str='50',
     color1:  str = 'C0', color2:  str = 'C1',
     plotmode:  str='eeufs',
-    figname=None, residuals: str='del'):
+    figname=None):
+    """Plot spectra in eeufs format for NuSTAR data (i.e. two detectors)"""
 
 
     ms = 5
     alpha = 0.4
     if ax_spe is None:
-        fig, ax_spe, ax_res = make_figure(residuals=residuals)
+        fig, ax_spe, ax_res = make_figure()
     colors = [color1, color2]
     for group in [1, 2]:
         Plot.device = '/null'
@@ -149,28 +126,16 @@ def plot_spe_nu(Plot,
 
         Plot.device = '/null'
 
-        if residuals == 'rat':
-            Plot('rat')
-            Plot.setRebin(min_sig, min_bin)
-            Plot.xAxis = 'keV'
+        Plot('del')
+        Plot.setRebin(min_sig, min_bin)
+        Plot.xAxis = 'keV'
 
-            rat = Plot.y(plotGroup=group)
-            rat_err = Plot.yErr(plotGroup=group)
+        rat = Plot.y(plotGroup=group)
+        rat_err = Plot.yErr(plotGroup=group)
 
-            ax_res.plot(en, rat, 'o', label=label, color=color, alpha=alpha, ms = ms)
-            ax_res.errorbar(en, rat, rat_err, en_err,
-                            fmt='none', ecolor=color, alpha=alpha)
-        if residuals == 'del':
-            Plot('del')
-            Plot.setRebin(min_sig, min_bin)
-            Plot.xAxis = 'keV'
-
-            rat = Plot.y(plotGroup=group)
-            rat_err = Plot.yErr(plotGroup=group)
-
-            ax_res.plot(en, rat, 'o', label=label, color=color, alpha=alpha, ms = ms)
-            ax_res.errorbar(en, rat, rat_err, en_err,
-                            fmt='none', ecolor=color, alpha=alpha)
+        ax_res.plot(en, rat, 'o', label=label, color=color, alpha=alpha, ms = ms)
+        ax_res.errorbar(en, rat, rat_err, en_err,
+                        fmt='none', ecolor=color, alpha=alpha)
 
         if figname is not None:
             fig.savefig(figname)
@@ -190,38 +155,61 @@ def load_nu_spe(spe1: str, spe2: str, en_lo='4.', en_hi='79.'):
 def load_bin_spe(bin_num: str, en_lo='4.', en_hi='79.'):
     spe1 = f'phase_resolved_bin{bin_num}A_sr.pi'
     spe2 = f'phase_resolved_bin{bin_num}B_sr.pi'
-    print(f' loaded {spe1} and {spe2}')
     return load_nu_spe(spe1=spe1, spe2=spe2, en_lo=en_lo, en_hi=en_hi)
 
 
 
 def fit_spectra(model: xspec.model.Model,
-                prefix: str,  model_name: str,
+                prefix: str,  
+                model_name: str,
                 dataset: str = 'spe_and_lc',
                 error_conf: str = '2.71',
-                en_lo='4.', en_hi='79.',
-                min_sig=50, min_bin=50,
+                en_lo: str='4.', en_hi: str='79.',
+                min_sig: str = '50', min_bin: str ='50',
                 rewrite: bool = True,
-                calc_errors=True,
-                perturb_fit_sigma=0.0,
-                ignore_comp_errors=[],
-                eqw_comps=['gaussian'],
-                eqw_cl=90):
+                calc_errors: bool=True,
+                ignore_comp_errors:Optional[list] = None,
+                eqw_comps: Optional[list] = None,
+                eqw_cl: str='90') -> Storage:
+    """
+    fit_spectra loads given spectra and fits it with the given model
+
+    Args:
+        model (xspec.model.Model): xspec model to fit spectra with. If string, the model is  loaded from the model file (if any).
+        prefix (str): prefix for the model name, e.g. Observation number
+        model_name (str): name of a model, e.g. 'cutoffplaw'
+        dataset (str, optional): spectral files to load. adds _srA/_srB to it.  Defaults to 'spe_and_lc'. Function should be called in the folder with the spectra and responses.
+        error_conf (str, optional): Xspec error command. 2.71 is 90% probability interval. Defaults to '2.71'.
+        en_lo (str, optional): lower energy of the spectral fits, in keV. Defaults to '4.'.
+        en_hi (str, optional): upper energy of the spectral fits, in keV. Defaults to '79.'.
+        min_sig (str, optional): setpl  for plotting: minimum significance of the bin. Defaults to '50'.
+        min_bin (str, optional): setpl for plotting: maximum number of adjacent bins . Defaults to '50'.
+        rewrite (bool, optional): whether to rewrite output files. Defaults to True.
+        calc_errors (bool, optional): whether to call error command in Xspec. Defaults to True.
+        ignore_comp_errors (Optional[list], optional): List of components for which errors are not calculated. If none, calculates every error. Defaults to None.
+        eqw_comps (Optional[list], optional): List of components for which equivalent width is calculated. If none, calculates nothing. Defaults to None.
+        eqw_cl (str, optional): confidence interlval for eqw calculation, in per cents. Defaults to '90'.
+
+    Returns:
+        fit Storage  object
+    """
+
+
     Fit.query = "yes"
-    assert '_' not in model_name,  'model_name cannot contain "_"'
+    assert '_' not in model_name,  'model_name cannot contain "_"' 
     data_name = prefix + '_'+model_name
+    create_dir(f'xspec')
     create_dir(f'xspec/{model_name}')
     create_dir(f'xspec/{model_name}/xcm')
     if rewrite:
-        os.system(f'rm -r xspec/{model_name}/*{data_name}*')
-        os.system(f'rm -r xspec/{model_name}/xcm/*{data_name}*')
+        os.system(f'rm -rf xspec/{model_name}/*{data_name}*')
+        os.system(f'rm -rf xspec/{model_name}/xcm/*{data_name}*')
         print(
             f"deleted xspec/{model_name}/*{data_name}* and xspec/{model_name}/xcm/*{data_name}* files")
 
     try:
-        print(f'Try loading storage xspec/{model_name}/{data_name}.storage')
         s = Storage().from_pikle(f'xspec/{model_name}/{data_name}.storage')
-        print('loaded')
+        print(f'loading storage xspec/{model_name}/{data_name}.storage...')
         return s
     except:
         print('no storage found. fitting...')
@@ -230,6 +218,8 @@ def fit_spectra(model: xspec.model.Model,
     spe1 = f'{dataset}A_sr.pi'
     spe2 = f'{dataset}B_sr.pi'
     S1, S2 = load_nu_spe(spe1=spe1, spe2=spe2, en_lo=en_lo, en_hi=en_hi)
+
+    #save xspec data infromation for quick loading via xspec's @<path to xcm file> command.
     xspec.Xset.save(f'xspec/{model_name}/xcm/{data_name}.xcm_data', info='f')
 
     if isinstance(model, xspec.model.Model):
@@ -250,29 +240,17 @@ def fit_spectra(model: xspec.model.Model,
             raise Exception(
                 f'model not understood. should be either xspec.model.Model or xspec .xcm file with model parameters. \n Given: {model}')
 
+    #save initial model for quick access
     xspec.Xset.save(
         f'xspec/{model_name}/xcm/{data_name}.xcm_model_init', info='m')
 
-    Fit.query = 'yes'
     Fit.statMethod = "chi"
-
-    Fit.query = "yes"
-
-    if perturb_fit_sigma != 0:
-        print('perturbing ininital guess before fitting')
-        for comp_name in m1.componentNames:
-            comp = getattr(m1, comp_name)
-            for par_name in comp.parameterNames:
-                par = getattr(comp, par_name)
-                if not par.frozen:
-                    val, delta, _, _, _, _ = par.values
-                    # print(comp.name, par.name)
-                    par.values = np.random.normal(val, delta*perturb_fit_sigma)
-        # showmodel(m1)
 
     Fit.perform()
     print('fitting done')
     if calc_errors:
+        if ignore_comp_errors is None:
+            ignore_comp_errors = []
         print(f'skipping errors for: {ignore_comp_errors}')
         err_idx = [str(m2.startParIndex)]
         for comp_name in m1.componentNames:
@@ -292,27 +270,28 @@ def fit_spectra(model: xspec.model.Model,
         pass
 
     print(
-        f"Fit done \n chi2 = {Fit.statistic} for {Fit.dof} dof, chi2_red = {Fit.statistic/Fit.dof}, H0 prob = {Fit.nullhyp}")
-
+        f"Fit done;  chi2 = {Fit.statistic} for {Fit.dof} dof, chi2_red = {Fit.statistic/Fit.dof}, H0 prob = {Fit.nullhyp}")
+    #save model and model+data for quick access
     xspec.Xset.save(
         f'xspec/{model_name}/xcm/{data_name}.xcm_model', info='m')
     xspec.Xset.save(f'xspec/{model_name}/xcm/{data_name}.xcm', info='a')
 
     try:
-        plot_spe_nu(Plot, residuals='del', min_bin=min_bin, min_sig=min_sig,
+        plot_spe_nu(Plot, min_bin=min_bin, min_sig=min_sig,
                     figname=f'xspec/{model_name}/{data_name}.png')
     except:
         plt.close('all')
-        plot_spe_nu(Plot, residuals='del', min_bin=min_bin, min_sig=min_sig,
+        plot_spe_nu(Plot,  min_bin=min_bin, min_sig=min_sig,
                     figname=f'xspec/{model_name}/{data_name}.png')
 
+    #container objects from storage.py by P. Medvedev
     cA = Container(data_name+'_FPMA')
     cA.get_session(group=1)
     cB = Container(data_name+'_FPMB')
     cB.get_session(group=2)
 
-    eqw_comps = [m1.componentNames.index(comp)+1 for comp in eqw_comps]
-    if len(eqw_comps)!=0:
+    if eqw_comps is  not None:
+        eqw_comps = [m1.componentNames.index(comp)+1 for comp in eqw_comps]
         for comp in eqw_comps:
             if eqw_cl==0:
                 AllModels.eqwidth(comp)
@@ -350,13 +329,154 @@ def fit_spectra(model: xspec.model.Model,
     return s
 
 
-def ph_res_param(
-    ser,
-    funct=lambda x: x,
-    plot=1, ax=None, title='', colors=None,
-    delta_limits=0.05, plot_relative=False,
-                 **plt_kwargs):
+# def scan_containers_ph_ave(model):
+#     tmp_list = []
+#     for storage in glob(f'xspec/{model}/*storage'):
+#         s = Storage().from_pikle(storage)
+#         fpma = s[0].params
+#         fpmb = s[1].params
+#         fit = s[0].fit
+#         # splitting a string like this: 90302319002_bbody_FPMA
+#         ObsID, model, detA = s._srcID[0].split('_')
+#         _, _,  detB = s._srcID[1].split('_')
 
+#         for df in [fpma, fpmb]:
+#             # df['ObsID']='obs'+ObsID
+#             df['ObsID'] = ObsID
+#             df['model'] = model
+#             #df['statistic'] = fit.statistic
+#             #df['dof'] = fit.dof
+
+#         fpma['det'] = detA
+#         fpmb['det'] = detB
+
+#         tmp_list.append(fpma)
+#         tmp_list.append(fpmb)
+#         # tmp_list.append(fit)
+
+#     ph_ave_results = pd.concat(tmp_list)
+#     ph_ave_results = ph_ave_results.drop(
+#         ['ipar', 'sigma', 'link'], axis=1)  # delete unneeded columns
+
+#     ph_ave_results.index = range(len(ph_ave_results))
+
+#     ph_ave_results = ph_ave_results.drop(ph_ave_results[(
+#         ph_ave_results.det == 'FPMB') & (ph_ave_results.par != 'factor')].index)
+#     ph_ave_results = ph_ave_results.drop(ph_ave_results[(
+#         ph_ave_results.det == 'FPMA') & (ph_ave_results.par == 'factor')].index)
+#     ph_ave_results = ph_ave_results.drop(
+#         ['det'], axis=1)  # delete unneeded columns
+
+#     ph_ave_results_reind = ph_ave_results.set_index(
+#         ['ObsID','model', 'comp',  'par'])
+#     chi2_str = f"chi2 {fit.statistic.iloc[0]:.2f}/{fit.dof.iloc[0]:.0f}"
+#     ph_ave_results_reind.loc[ObsID, model, 'stat', 'chi2'] = chi2_str
+#     ph_ave_results_reind.loc[ObsID, model, 'flux', 'flux'] = 'chi2 ---'
+#     return ph_ave_results_reind
+
+
+# def query_par(fit_res, ObsID, model, comp, par, shift=0):
+    
+#     df = fit_res.loc[(ObsID, shift, model,    comp, par)].sort_values('phase')
+#     title = ('.').join([ObsID, model, comp, par])
+#     return df, title
+
+
+
+def scan_containers_ph_res(model_name:  str) -> pd.DataFrame:
+    """
+    scan_containers_ph_res scans xspec containers for the results of the  phase-resolved  spectrum fitting.
+
+    Args:
+        model_name (str): model name
+
+    Returns:
+        pd.DataFrame: DataFrame with  fitting result. Pivot = [component name, parameter name, phase]
+    """
+
+    tmp_list = []
+    #scan for storage pickles
+    for storage in glob(f'xspec/{model_name}/*storage'):
+        s = Storage().from_pikle(storage)
+        fpma = s[0].params
+        fpmb = s[1].params
+        # splitting a string like this: 90302319002_bin2_bbody_FPMA
+        ObsID, binnum, model, detA = s._srcID[0].split('_')
+        _, _, _, detB = s._srcID[1].split('_')
+
+        for df in [fpma, fpmb]:
+            # df['ObsID']='obs'+ObsID
+            df['ObsID'] = ObsID
+            df['binnum'] = int(binnum[3:])
+            df['model'] = model
+
+        fpma['det'] = detA
+        fpmb['det'] = detB
+
+        tmp_list.append(fpma)
+        tmp_list.append(fpmb)
+
+    #make a  data frame
+    ph_res_results = pd.concat(tmp_list)
+    
+    #delete linked pars
+    ph_res_results=ph_res_results[ph_res_results.link=='']
+    # delete unneeded columns
+    ph_res_results = ph_res_results.drop(
+        ['ipar', 'sigma', 'link'], axis=1)  
+    ph_res_results = ph_res_results.reset_index()
+    
+    #set phase 
+    nph = ph_res_results['binnum'].max()
+    ph_res_results['binnum'] = ph_res_results['binnum'] / nph - 0.5/(nph)
+    ph_res_results = ph_res_results.rename(columns = {'binnum':'phase'})
+
+    #drop fpmb info, including constant term
+    ph_res_results = ph_res_results.drop(ph_res_results[(
+        (ph_res_results.det == 'FPMB') & (ph_res_results.par != 'factor'))].index, axis = 0)
+
+    #drop fpma constant info
+    ph_res_results = ph_res_results.drop(ph_res_results[(
+        ph_res_results.det == 'FPMA') & (ph_res_results.par == 'factor')].index)
+    
+    #drop columns
+    ph_res_results = ph_res_results.drop(['det'], axis = 1)
+    ph_res_results = ph_res_results.drop(['index'], axis = 1)
+
+    #sort by phase
+    ph_res_results = ph_res_results.sort_values(['phase'], ascending=True)
+
+    #set pivot
+    ph_res_results = ph_res_results.pivot_table(index = ['comp','par', 'phase'])
+    return ph_res_results
+
+
+
+def ph_res_param(
+    df: pd.DataFrame,
+    comp:str, par:str,
+    funct=lambda x: x,
+    plot:  bool =True, ax:Optional[plt.Axes]=None,
+    **plt_kwargs) -> Tuple: 
+    """
+    ph_res_param plots a phase-resolved spectral parameters for a given data frame and components. Produces plots with phase from 0 to 2pi.
+
+    Args:
+        df (pd.DataFrame): dataframe with fitting results. Pivot as in scan_containers_ph_res
+        comp (str): component name
+        par (str): parameter name
+        funct (function, optional): function to act on the values, e.g. lambda x: x/100. Defaults to lambdax:x.
+        plot (bool, optional): whether to  plot  the result. Defaults to True.
+        ax (Optional[plt.Axes], optional): axis to plot result on. Defaults to None.
+
+    Raises:
+        Exception: _description_
+
+    Returns:
+        Tuple: phase, value and error
+    """
+
+    ser = df.loc[pd.IndexSlice[comp, par, :]]
     def get_parr_array(ser, funct):
 
         mean = funct(ser.val)
@@ -369,195 +489,76 @@ def ph_res_param(
 
         return mean, err
 
-    phase = ser.phase
+    phase = ser.index.values#ser.phase
     try:
         mean, err = get_parr_array(ser, funct)
     except:
         raise Exception(f'Error with get par {ser}')
 
     phase = np.concatenate((phase, phase+1))
-    dphase = np.diff(phase)[0]
+    #dphase = np.diff(phase)[0]
     mean = np.concatenate((mean, mean))
     err = np.hstack((err, err))
-    if colors is not None:
-        colors  = colors[1:] + colors[:]
 
     if plot:
         if ax == None:
             fig, ax = plt.subplots(figsize=(12, 4))
-            ax.set_title(title)
         
         ax.plot(phase, mean, alpha = 0, label ='_pass', color = 'white')
         ax.set_ylim()
         ax.errorbar(phase, mean, yerr=err, drawstyle='steps-mid', **plt_kwargs)
-        if colors is not None:
-            for phase_bin, color_bin in zip(phase, colors):
-                ax.axvspan(phase_bin-dphase/2, phase_bin+dphase/2, color = color_bin, alpha = 0.2)
-                #ax.axvspan(phase_bin-dphase/2+1, phase_bin+dphase/2+1, color = color_bin, alpha = 0.2)
+
         ax.set_xlabel('phase')
-        ax.set_ylabel('')
-        valmin, valmax = np.min(mean), np.max(mean)
-        #valmean = np.mean(mean)
-        #delta = valmax - valmin
-        # ax.set_ylim(valmean-delta_limits*delta, valmean+delta_limits*delta)
-        #ax.set_ylim((1-delta_limits)*valmin, (1+delta_limits)*valmax)
-        if plot_relative:
-            axt = ax.twinx()
-            factor = np.ma.average(mean,
-                                   weights=np.max(err, axis=0))
-            axt.errorbar(
-                phase, mean/factor, err/factor, alpha=0.3, fmt='-', color='k', ecolor='k')
-            axt.grid(False)
-            axt.set_ylabel('rel. change')
-        ax.legend()
+        ax.set_ylabel(comp+':'+par)
+
     return phase, mean, err
 
 
-def scan_containers_ph_res(model_name, ph_res_folder = None):
-    if ph_res_folder is not None:
-        os.chdir(ph_res_folder)
-    tmp_list = []
-    for storage in glob(f'xspec/{model_name}/*storage'):
-        s = Storage().from_pikle(storage)
-        fpma = s[0].params
-        fpmb = s[1].params
-        fit = s[0].fit
-        # splitting a string like this: 90302319002_bin2_shift_0_bbody_FPMA
-        ObsID, binnum, shift, model, detA = s._srcID[0].split('_')
-        _, _, _, _, detB = s._srcID[1].split('_')
-
-        for df in [fpma, fpmb]:
-            # df['ObsID']='obs'+ObsID
-            df['ObsID'] = ObsID
-            df['binnum'] = int(binnum[3:])
-            df['shift'] = int(shift[5:])
-            df['model'] = model
-            df['statistic'] = fit.statistic
-            df['dof'] = fit.dof
-
-        fpma['det'] = detA
-        fpmb['det'] = detB
-
-        tmp_list.append(fpma)
-        tmp_list.append(fpmb)
-        # tmp_list.append(fit)
-
-    ph_res_results = pd.concat(tmp_list)
-    ph_res_results = ph_res_results.drop(
-        ['ipar', 'sigma', 'link'], axis=1)  # delete unneeded columns
-    ph_res_results.index = range(len(ph_res_results))
-    nph = ph_res_results['binnum'].max()
-    ph_res_results['phase'] = ph_res_results['binnum'] / nph - 0.5/(nph)
-    ph_res_results = ph_res_results.drop(ph_res_results[(
-        ph_res_results.det == 'FPMB') & (ph_res_results.par != 'factor')].index)
-    ph_res_results = ph_res_results.drop(ph_res_results[(
-        ph_res_results.det == 'FPMA') & (ph_res_results.par == 'factor')].index)
-    ph_res_results = ph_res_results.drop(
-        ['det', 'binnum'], axis=1)  # delete unneeded columns
-
-    ph_res_results_reind = ph_res_results.set_index(
-        ['ObsID', 'shift', 'model', 'comp',  'par'])
-    ph_res_results_reind = ph_res_results_reind.sort_index()
-
-    return ph_res_results_reind
 
 
-def scan_containers_ph_ave(model = '*'):
-    tmp_list = []
-    for storage in glob(f'xspec/{model}/*storage'):
-        s = Storage().from_pikle(storage)
-        fpma = s[0].params
-        fpmb = s[1].params
-        fit = s[0].fit
-        # splitting a string like this: 90302319002_bbody_FPMA
-        ObsID, model, detA = s._srcID[0].split('_')
-        _, _,  detB = s._srcID[1].split('_')
-
-        for df in [fpma, fpmb]:
-            # df['ObsID']='obs'+ObsID
-            df['ObsID'] = ObsID
-            df['model'] = model
-            #df['statistic'] = fit.statistic
-            #df['dof'] = fit.dof
-
-        fpma['det'] = detA
-        fpmb['det'] = detB
-
-        tmp_list.append(fpma)
-        tmp_list.append(fpmb)
-        # tmp_list.append(fit)
-
-    ph_ave_results = pd.concat(tmp_list)
-    ph_ave_results = ph_ave_results.drop(
-        ['ipar', 'sigma', 'link'], axis=1)  # delete unneeded columns
-
-    ph_ave_results.index = range(len(ph_ave_results))
-
-    ph_ave_results = ph_ave_results.drop(ph_ave_results[(
-        ph_ave_results.det == 'FPMB') & (ph_ave_results.par != 'factor')].index)
-    ph_ave_results = ph_ave_results.drop(ph_ave_results[(
-        ph_ave_results.det == 'FPMA') & (ph_ave_results.par == 'factor')].index)
-    ph_ave_results = ph_ave_results.drop(
-        ['det'], axis=1)  # delete unneeded columns
-
-    ph_ave_results_reind = ph_ave_results.set_index(
-        ['ObsID','model', 'comp',  'par'])
-    chi2_str = f"chi2 {fit.statistic.iloc[0]:.2f}/{fit.dof.iloc[0]:.0f}"
-    ph_ave_results_reind.loc[ObsID, model, 'stat', 'chi2'] = chi2_str
-    ph_ave_results_reind.loc[ObsID, model, 'flux', 'flux'] = 'chi2 ---'
-    return ph_ave_results_reind
 
 
-def query_par(fit_res, ObsID, model, comp, par, shift=0):
+def plot_ph_res_storage(df_ph_res: pd.DataFrame,  nu_obs: NustarObservation, prodpath_ph_res: str, nrows: int=3) -> plt.Figure:
+    """
+    plot_ph_res_storage plots the whole contained with phase-resolved parameters. Does not  plot frozen parameters.
+
+    Args:
+        df_ph_res (pd.DataFrame): DataFrame with phase-resolved results. Pivot as in scan_containers_ph_res
+        nu_obs (NustarObservation): NustarObservation object needed for plotting pulse profiles.
+        prodpath_ph_res (str): path to phase-resolved products (for plotting pulse profiles of all bins)
+        nrows (int, optional): number or rows in a plot. Defaults to 3.
     
-    df = fit_res.loc[(ObsID, shift, model,    comp, par)].sort_values('phase')
-    title = ('.').join([ObsID, model, comp, par])
-    return df, title
+    returns:
+        Figure: figure with phase-resolved plots
+    """
 
 
-def query_par_ph_ave(fit_res, model, comp, par):
-    df = fit_res.loc[(model,    comp, par)]  # .sort_values('ObsID')
-    return df
+    #reset index to get rid of phase column
+    df_ph_res_reset = df_ph_res.reset_index()
+    df_ph_res_reset  = df_ph_res_reset[df_ph_res_reset.frozen  == False]
+
+    #https://stackoverflow.com/questions/29975835/how-to-create-pandas-groupby-plot-with-subplots
+    #group by components
+    grouped = df_ph_res_reset.groupby(['comp', 'par'])
+    rowlength = int(grouped.ngroups/nrows)+1
+    
+    fig, axs = plt.subplots(figsize=(14,8), 
+                            nrows=nrows, ncols=rowlength,    
+                            gridspec_kw=dict(hspace=0.0),  squeeze=True) 
+    axs = axs.flatten()
+    targets = zip(grouped.groups.keys(), axs)
+    for (key, ax) in targets:
+        df_tmp = grouped.get_group(key).set_index(['comp', 'par', 'phase'])
+        ph_res_param(df=df_tmp, comp=key[0], par=key[1], ax=ax)
+        ax.set_ylabel(key)
 
 
-def plot_ph_res_storage(ph_res_results,  nu_obs, prodpath_ph_res, cols=3):
-    variable_pars = ph_res_results[(ph_res_results.frozen == False) & (
-        ph_res_results.index.get_level_values('par') != 'factor')]
-    frozen_pars = ph_res_results[ph_res_results.frozen == True]
-    frozen_pars = [f"{par[3]}:{par[4]}" for par in frozen_pars.index.unique()]
-    params = variable_pars.index.unique()
-    npars = len(params)+1
+    axs[0].clear()
+    efolds = glob('*.efold')
+    _, colors = nu_obs.plot_efolds_of_bins(prodpath=prodpath_ph_res,        efolds_files=efolds, ax_efold=axs[0], fig=fig,
+                                               save=False, legend=False, phase_zero_efold_file=nu_obs.products_path+'/phase_resolved/'+'phase_resolved_bin1AB_sr.lc_bary_nphase_128.efold')
 
-    nplots = npars+cols
-    rows = int(np.ceil(nplots / cols))
+    plt.show()
 
-    gs = gridspec.GridSpec(rows, cols)
-    fig = plt.figure(figsize=(14, 8))
-
-    ax0 = fig.add_subplot(gs[0])
-    # plt.text(x=0.1, y=0.94,
-    #         s=f"frozen params: {frozen_pars}", fontsize=6, transform=fig.transFigure)
-    ax0.set_title(
-        f"frozen params: {frozen_pars[:len(frozen_pars)//2]} \n {frozen_pars[len(frozen_pars)//2:]}", fontsize=6,)
-    for ii in range(cols):
-        ax = fig.add_subplot(gs[ii], sharex=ax0)
-        efolds = glob('*.efold')
-        _, colors = nu_obs.check_efold_of_bins(prodpath=prodpath_ph_res, efolds_files=efolds, fiducial=None, ax_efold=ax, fig=fig,
-                                               save=False, legend=False, phase_zero_efold='phase_resolved_bin1AB_sr.lc_bary_orb_corr_nphase_128.efold')
-
-    for ii, par in enumerate(params, cols):
-        ax = fig.add_subplot(gs[ii], sharex=ax0)
-        ObsID, prod_shift, model_name, comp, parname = par
-        df, title = query_par(fit_res=ph_res_results, ObsID=ObsID,
-                              model=model_name,    comp=comp,     par=parname, shift=prod_shift)
-        ph_res_param(df, label=f"{comp}:{parname}",  funct=lambda x: x,
-                     alpha=0.6, color='k', lw=2,  ax=ax)
-    fig.suptitle(f"{ObsID} {model_name}")
-
-    ax = fig.add_subplot(gs[ii+1], sharex=ax0)
-    ax.scatter(ph_res_results.phase, ph_res_results.statistic/ph_res_results.dof)
-    ax.scatter(ph_res_results.phase+1, ph_res_results.statistic/ph_res_results.dof)
-    ax.legend(['chi^2/dof'])
-    fig.tight_layout()
-    plt.subplots_adjust(hspace=0)
     return fig
+
