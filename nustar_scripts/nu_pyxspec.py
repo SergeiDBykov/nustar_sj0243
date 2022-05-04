@@ -246,7 +246,9 @@ def fit_spectra(model: xspec.model.Model,
 
     Fit.statMethod = "chi"
 
+    Fit.query = 'yes'
     Fit.perform()
+    Fit.query = 'yes'
     print('fitting done')
     if calc_errors:
         if ignore_comp_errors is None:
@@ -261,7 +263,8 @@ def fit_spectra(model: xspec.model.Model,
                     err_idx.append(str(par.index))
         for err_ix in err_idx:
             try:
-                Fit.error(f"nonew maximum 20. {error_conf} {err_ix}")
+                err_commdns = f"nonew maximum 20. {error_conf} {err_ix}"
+                Fit.error(err_commdns)
             except:
                 print(f"Errorr fail with {err_ix}")
 
