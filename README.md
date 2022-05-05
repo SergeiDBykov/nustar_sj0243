@@ -27,7 +27,7 @@ The data analysis is illustrated on the X-ray pulsar **Swift J0243.6+6124**, and
 - `./data_analysis`  
  the notebooks for the pipeline management are stored in this folder.
     1. `./data_analysis/nustar_pipeline/`  Store the notebooks to reduce the raw science data into high-level products. The  instructions are given in the notebooks. I highly recommend to create a separate notebooks for each observation. `*_ph_averaged_*` notebooks are used to create the phase-averaged products. `*_ph_resolved_*` notebooks are used to create the phase-resolved products.
-    2. `./nustar_scripts/model_*/` contains notebooks with spectral fitting of science product. Again I advise to create a separate notebook for each observation.
+    2. `./nustar_scripts/model_*/` contains notebooks with spectral fitting of science product. Again I advise to create a separate notebook for each observation, and for every spectral model (e.g. `cutoffpl`) create an appropriate folder (e.g. `./nustar_scripts/model_cuutoffpl/`).
     3. `./nustar_scripts/plots_and_tables/` contains (example) notebooks with the final results report: plots, tables, etc
     
 -----
