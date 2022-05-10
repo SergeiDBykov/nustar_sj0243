@@ -1,7 +1,8 @@
 
 Nu_path = "/Users/sdbykov/work/xray_pulsars/nustar_sj0243/" #path to the repository
-analysis_path = Nu_path+"nustar_products/results/" #path to the analysis results
-plot_path = Nu_path+'data_analysis/final_results/figures_tables/'  #path to the plots
+analysis_path = Nu_path+"nustar_products/" #path to the analysis results
+
+plot_path = Nu_path+'results/figs/'  #path to the plots
 obj_name = "Swift J0243.6+6124" #name of the pulsar 
 
 #list of observations
