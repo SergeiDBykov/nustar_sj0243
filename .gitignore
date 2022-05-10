@@ -190,3 +190,8 @@ workspace.code-workspace
 data_analysis/junk
 nustar_data/*/
 nustar_products/*/
+
+#for docker heasoft
+.regions
+.bary_test
+.bash_profile.sh
