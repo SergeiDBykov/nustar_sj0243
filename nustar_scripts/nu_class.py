@@ -645,7 +645,7 @@ class NustarObservation:
         prodpath: str = "phase_resolved",
         ax_efold=None,
         fig=None,
-        save: bool=True,
+        save: bool=False,
         legend: bool=False,
     ):
         #check_efold_of_bins builds period-folded lightcurves for each phase bin and compares with the folded lightcurve of the whole observation if necessary
@@ -728,7 +728,7 @@ class NustarObservation:
         ax_efold.set_ylabel("Rate")
         ax_efold.set_xlim(-0.1, 2.1)
         ax_efold.relim()  # type: ignore
-        fig.tight_layout()
+        #fig.tight_layout()
         plt.show()
         if save:
             fig.savefig("efold.png")

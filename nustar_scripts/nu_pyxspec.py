@@ -474,8 +474,13 @@ def scan_containers_ph_res(model_name:  str) -> pd.DataFrame:
         fpma = s[0].params
         fpmb = s[1].params
         # splitting a string like this: 90302319002_bin2_bbody_FPMA
-        ObsID, binnum, model, detA = s._srcID[0].split('_')
-        _, _, _, detB = s._srcID[1].split('_')
+        try:
+            ObsID, binnum, model, detA = s._srcID[0].split('_')
+        except ValueError:
+            #print(f'failed to unpack {s._srcID[0]}')
+            ObsID, binnum, _, model, detA = s._srcID[0].split('_')
+        #_, _, _, detB = s._srcID[1].split('_') #TODO cehck shift name 
+        detB = 'FPMA'
 
         for df in [fpma, fpmb]:
             # df['ObsID']='obs'+ObsID
@@ -580,7 +585,6 @@ def ph_res_param(
         ax.plot(phase, mean, alpha = 0, label ='_pass', color = 'white')
         ax.set_ylim()
         ax.errorbar(phase, mean, yerr=err, drawstyle='steps-mid', **plt_kwargs)
-
         ax.set_xlabel('phase')
         ax.set_ylabel(comp+':'+par)
 
@@ -618,7 +622,10 @@ def plot_ph_res_storage(df_ph_res: pd.DataFrame,  nu_obs: NustarObservation, pro
     fig, axs = plt.subplots(figsize=(14,8), 
                             nrows=nrows, ncols=rowlength,    
                             gridspec_kw=dict(hspace=0.0),  squeeze=True) 
+    
     axs = axs.flatten()
+    ax0= axs[0]
+    axs = axs[1:]
     targets = zip(grouped.groups.keys(), axs)
     for (key, ax) in targets:
         df_tmp = grouped.get_group(key).set_index(['comp', 'par', 'phase'])
@@ -626,11 +633,14 @@ def plot_ph_res_storage(df_ph_res: pd.DataFrame,  nu_obs: NustarObservation, pro
         ax.set_ylabel(key)
 
 
-    axs[0].clear()
+    #axs[0].clear()
     efolds = glob('*.efold')
-    _, colors = nu_obs.plot_efolds_of_bins(prodpath=prodpath_ph_res,        efolds_files=efolds, ax_efold=axs[0], fig=fig,
+    try:
+        _, colors = nu_obs.plot_efolds_of_bins(prodpath=prodpath_ph_res,        efolds_files=efolds, ax_efold=ax0, fig=fig,
                                                save=False, legend=False, phase_zero_efold_file=nu_obs.products_path+'/phase_resolved/'+'phase_resolved_bin1AB_sr.lc_bary_nphase_128.efold')
-
+    except:
+                _, colors = nu_obs.plot_efolds_of_bins(prodpath=prodpath_ph_res,        efolds_files=efolds, ax_efold=ax0, fig=fig,
+                                               save=False, legend=False, phase_zero_efold_file=nu_obs.products_path+'/phase_resolved/'+'phase_resolved_bin1AB_sr.lc_bary_orb_corr_nphase_128.efold') #TODO fix this
     plt.show()
 
     return fig
