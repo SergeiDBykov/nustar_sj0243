@@ -385,6 +385,76 @@ def fit_spectra(model: xspec.model.Model,
 #     return df, title
 
 
+def scan_containers_ph_ave(model_name:  str) -> pd.DataFrame:
+    """
+    scan_containers_ph_ave scans xspec containers for the results of the  phase-averaged  spectrum fitting.
+
+    Args:
+        model_name (str): model name
+
+    Returns:
+        pd.DataFrame: DataFrame with  fitting result. Pivot = [component name, parameter name]
+    """
+
+    tmp_list = []
+    #scan for storage pickles
+    for storage in glob(f'xspec/{model_name}/*storage'):
+        s = Storage().from_pikle(storage)
+        fpma = s[0].params
+        fpmb = s[1].params
+        fit = s[0].fit
+        # splitting a string like this: 90302319002_bbody_FPMA
+        ObsID, model, detA = s._srcID[0].split('_')
+        _, _, detB = s._srcID[1].split('_')
+
+        for df in [fpma, fpmb]:
+            # df['ObsID']='obs'+ObsID
+            df['ObsID'] = ObsID
+            df['model'] = model
+
+        fpma['det'] = detA
+        fpmb['det'] = detB
+
+        tmp_list.append(fpma)
+        tmp_list.append(fpmb)
+
+    #make a  data frame
+    ph_res_results = pd.concat(tmp_list)
+    
+    #delete linked pars
+    ph_res_results=ph_res_results[ph_res_results.link=='']
+    # delete unneeded columns
+    ph_res_results = ph_res_results.drop(
+        ['ipar', 'sigma', 'link'], axis=1)  
+    ph_res_results = ph_res_results.reset_index()
+    
+
+    #drop fpmb info, including constant term
+    ph_res_results = ph_res_results.drop(ph_res_results[(
+        (ph_res_results.det == 'FPMB') & (ph_res_results.par != 'factor'))].index, axis = 0)
+
+    #drop fpma constant info
+    ph_res_results = ph_res_results.drop(ph_res_results[(
+        ph_res_results.det == 'FPMA') & (ph_res_results.par == 'factor')].index)
+    
+    #drop columns
+    ph_res_results = ph_res_results.drop(['det'], axis = 1)
+    ph_res_results = ph_res_results.drop(['index'], axis = 1)
+
+    #set pivot
+    ph_res_results = ph_res_results.pivot_table(index = ['ObsID','comp','par'])
+
+
+    chi2_str = f"chi2 {fit.statistic.iloc[0]:.2f}/{fit.dof.iloc[0]:.0f}"
+    ph_res_results.loc[ObsID, 'stat', 'chi2'] = chi2_str
+    ph_res_results.loc[ObsID, 'flux', 'flux'] = 'chi2 ---'
+
+    return ph_res_results
+
+
+
+
+
 
 def scan_containers_ph_res(model_name:  str) -> pd.DataFrame:
     """

@@ -3,7 +3,7 @@ import astropy.io.fits as fits
 from scipy.optimize import curve_fit
 import numpy as np
 import os
-
+import pandas as pd
 import matplotlib
 import seaborn as sns
 import matplotlib.pyplot as plt
