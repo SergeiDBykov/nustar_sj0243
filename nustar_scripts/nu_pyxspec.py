@@ -398,7 +398,7 @@ def scan_containers_ph_ave(model_name:  str) -> pd.DataFrame:
 
     tmp_list = []
     #scan for storage pickles
-    for storage in glob(f'xspec/{model_name}/*storage'):
+    for storage in glob(f'xspec/{model_name}/*storage'): #warning, if multiple storages per bin, this may scan wrong products!
         s = Storage().from_pikle(storage)
         fpma = s[0].params
         fpmb = s[1].params

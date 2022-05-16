@@ -197,3 +197,9 @@ nustar_products/*/
 .bash_profile.sh
 nustar_data/BAT_SwiftJ0243.txt
 nustar_data/XRT_SwiftJ0243.txt
+results/3.5_phase_resolved_free_pars.ipynb
+models/model_relxilllp_free_pars
+models/model_relxilllp_free_pars/relxilllp_90302319004.ipynb
+models/model_relxilllp_free_pars/relxilllp_90302319006.ipynb
+models/model_relxilllp_free_pars/relxilllp_90302319002.ipynb
+results/3.5_phase_resolved_free_pars.ipynb
