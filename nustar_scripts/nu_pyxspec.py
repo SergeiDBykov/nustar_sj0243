@@ -332,59 +332,6 @@ def fit_spectra(model: xspec.model.Model,
     return s
 
 
-# def scan_containers_ph_ave(model):
-#     tmp_list = []
-#     for storage in glob(f'xspec/{model}/*storage'):
-#         s = Storage().from_pikle(storage)
-#         fpma = s[0].params
-#         fpmb = s[1].params
-#         fit = s[0].fit
-#         # splitting a string like this: 90302319002_bbody_FPMA
-#         ObsID, model, detA = s._srcID[0].split('_')
-#         _, _,  detB = s._srcID[1].split('_')
-
-#         for df in [fpma, fpmb]:
-#             # df['ObsID']='obs'+ObsID
-#             df['ObsID'] = ObsID
-#             df['model'] = model
-#             #df['statistic'] = fit.statistic
-#             #df['dof'] = fit.dof
-
-#         fpma['det'] = detA
-#         fpmb['det'] = detB
-
-#         tmp_list.append(fpma)
-#         tmp_list.append(fpmb)
-#         # tmp_list.append(fit)
-
-#     ph_ave_results = pd.concat(tmp_list)
-#     ph_ave_results = ph_ave_results.drop(
-#         ['ipar', 'sigma', 'link'], axis=1)  # delete unneeded columns
-
-#     ph_ave_results.index = range(len(ph_ave_results))
-
-#     ph_ave_results = ph_ave_results.drop(ph_ave_results[(
-#         ph_ave_results.det == 'FPMB') & (ph_ave_results.par != 'factor')].index)
-#     ph_ave_results = ph_ave_results.drop(ph_ave_results[(
-#         ph_ave_results.det == 'FPMA') & (ph_ave_results.par == 'factor')].index)
-#     ph_ave_results = ph_ave_results.drop(
-#         ['det'], axis=1)  # delete unneeded columns
-
-#     ph_ave_results_reind = ph_ave_results.set_index(
-#         ['ObsID','model', 'comp',  'par'])
-#     chi2_str = f"chi2 {fit.statistic.iloc[0]:.2f}/{fit.dof.iloc[0]:.0f}"
-#     ph_ave_results_reind.loc[ObsID, model, 'stat', 'chi2'] = chi2_str
-#     ph_ave_results_reind.loc[ObsID, model, 'flux', 'flux'] = 'chi2 ---'
-#     return ph_ave_results_reind
-
-
-# def query_par(fit_res, ObsID, model, comp, par, shift=0):
-    
-#     df = fit_res.loc[(ObsID, shift, model,    comp, par)].sort_values('phase')
-#     title = ('.').join([ObsID, model, comp, par])
-#     return df, title
-
-
 def scan_containers_ph_ave(model_name:  str) -> pd.DataFrame:
     """
     scan_containers_ph_ave scans xspec containers for the results of the  phase-averaged  spectrum fitting.
@@ -393,7 +340,7 @@ def scan_containers_ph_ave(model_name:  str) -> pd.DataFrame:
         model_name (str): model name
 
     Returns:
-        pd.DataFrame: DataFrame with  fitting result. Pivot = [component name, parameter name]
+        pd.DataFrame: DataFrame with  fitting result. Pivot = [ObsID, component name, parameter name]
     """
 
     tmp_list = []
@@ -479,7 +426,7 @@ def scan_containers_ph_res(model_name:  str) -> pd.DataFrame:
         except ValueError:
             #print(f'failed to unpack {s._srcID[0]}')
             ObsID, binnum, _, model, detA = s._srcID[0].split('_')
-        #_, _, _, detB = s._srcID[1].split('_') #TODO cehck shift name 
+        #_, _, _, detB = s._srcID[1].split('_') #TODO remove this before publication 
         detB = 'FPMA'
 
         for df in [fpma, fpmb]:
@@ -640,7 +587,7 @@ def plot_ph_res_storage(df_ph_res: pd.DataFrame,  nu_obs: NustarObservation, pro
                                                save=False, legend=False, phase_zero_efold_file=nu_obs.products_path+'/phase_resolved/'+'phase_resolved_bin1AB_sr.lc_bary_nphase_128.efold')
     except:
                 _, colors = nu_obs.plot_efolds_of_bins(prodpath=prodpath_ph_res,        efolds_files=efolds, ax_efold=ax0, fig=fig,
-                                               save=False, legend=False, phase_zero_efold_file=nu_obs.products_path+'/phase_resolved/'+'phase_resolved_bin1AB_sr.lc_bary_orb_corr_nphase_128.efold') #TODO fix this
+                                               save=False, legend=False, phase_zero_efold_file=nu_obs.products_path+'/phase_resolved/'+'phase_resolved_bin1AB_sr.lc_bary_orb_corr_nphase_128.efold') #TODO remove this before publication 
     plt.show()
 
     return fig

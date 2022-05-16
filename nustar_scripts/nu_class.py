@@ -375,18 +375,6 @@ class NustarObservation:
                 """
         run_command(efsearch, cmd_name=cmd_name, rewrite=rewrite)
 
-    def fit_efsearch(self, filename: str, prodpath: str):
-        """
-        fit_efsearch fits efsearch file to find  period
-
-        Args:
-            filename (str): filename
-            prodpath (str): path to file
-        """
-        os.chdir(self.products_path + "/" + prodpath)
-        per, err, p_maxchi = fit_efsearch_data(filename + ".efs")
-        return per, err, p_maxchi
-
     def make_efold(
         self,
         filename: str,

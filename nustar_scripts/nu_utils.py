@@ -149,57 +149,6 @@ def start_stop(a: np.ndarray, trigger_val: float) -> np.ndarray:
     return idx.reshape(-1, 2) - [0, 1]
 
 
-def gauss(t: np.ndarray, t0: float, sigma: float, N: float) -> np.ndarray:
-    """
-    gaussian function  normalized to N at t0
-    """
-    return N * np.exp(-((t - t0) ** 2) / (2 * sigma**2))
-
-
-def fit_efsearch_data(
-    efsearcf_fits_file: str, savefig: bool = True,)-> Tuple[float, float, float]:
-    """
-    fit_efsearch_data tries to fit efsearch curve with a gaussian shape
-
-    Args:
-        efsearcf_fits_file (str): fits file with efsearch results
-        savefig (bool, optional): whether to save figure. Defaults to True.
-
-    Returns:
-        p, perr: best fit period and error
-    """
-
-    efsearch = fits.open(efsearcf_fits_file)
-    period = efsearch[1].data["period"]  # type: ignore
-    chisq = efsearch[1].data["chisqrd1"]  # type: ignore
-    sigma = (max(period) - min(period)) / 5
-    p_maxchi=period[np.argmax(chisq)]
-    p0 = [p_maxchi, sigma, max(chisq)]
-
-    fig, ax = plt.subplots()
-    ax.plot(period, chisq, label = 'efsearch')
-    ax.plot(period, gauss(period, *p0), "r-.")
-
-    try:
-        popt, perr = curve_fit(gauss, period, chisq, p0=p0)  # type: ignore
-        popt = np.array(popt)
-        perr = np.array(perr)
-        perr = np.sqrt(np.diag(perr))
-        ax.plot(period, gauss(period, *popt), "k-.",label = 'best fit')
-    except:
-        popt = np.array([0])
-        perr = np.array([0])
-
-    ax.set_title("Period=" + str(popt[0]) + "  sigma=" + str(popt[1]) + "\n")
-    ax.set_xlabel("Period")
-    ax.set_ylabel("chi^2")
-    ax.legend()
-    plt.show()
-    if savefig:
-        fig.savefig(f"{efsearcf_fits_file}.png")
-        plt.close(fig)
-    return popt[0], perr[0], p_maxchi
-
 
 def reduce_list(list: list) -> list:
     flat_list = [item for sublist in list for item in sublist]
