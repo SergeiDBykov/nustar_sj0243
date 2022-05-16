@@ -9,7 +9,6 @@ from .nu_utils import (
     create_dir,
     fits,
     run_command,
-    fit_efsearch_data,
     start_stop,
 )
 
