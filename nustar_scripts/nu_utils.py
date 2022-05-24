@@ -70,7 +70,7 @@ rc = {
     "scatter.edgecolors": "k",
 }
 
-def set_mpl(palette = 'vaporwave'):
+def set_mpl(palette = 'pastel'):
     matplotlib.rcParams.update(rc)
     #colors from seaborn or vapeplot (https://github.com/dantaki/vapeplot)
     if palette=='mallsoft':
