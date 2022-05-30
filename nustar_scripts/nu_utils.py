@@ -57,7 +57,7 @@ rc = {
     "xtick.minor.size": 4,
     "ytick.minor.size": 4,
 
-    'lines.markeredgewidth': 1.5,
+    'lines.markeredgewidth': 0, #1.5,
     "lines.markersize": 10,
     "lines.markeredgecolor": "k",
     'axes.titlelocation': 'left',
@@ -70,15 +70,18 @@ rc = {
     "scatter.edgecolors": "k",
 }
 
-def set_mpl(palette = 'pastel'):
+def set_mpl(palette = 'shap', desat = 0.8):
     matplotlib.rcParams.update(rc)
-    #colors from seaborn or vapeplot (https://github.com/dantaki/vapeplot)
-    if palette=='mallsoft':
-        sns.set_palette(["#fbcff3", "#f7c0bb", "#acd0f4", "#8690ff", "#30bfdd", "#7fd4c1"], color_codes = True) 
-    elif palette=='vaporwave':
-        sns.set_palette(['#94D0FF', "#966bff",'#FF6AD5', '#ff6a8b' ,'#8bde8b', '#20de8b'], color_codes = True) 
+    if palette == 'shap':
+        #colors from shap package: https://github.com/slundberg/shap
+        cp = sns.color_palette( ["#1E88E5", "#ff0d57", "#13B755", "#7C52FF", "#FFC000", "#00AEEF"])
+        sns.set_palette(cp, color_codes = True, desat = desat)
+    elif palette == 'shap_paired':
+        #colors from shap package: https://github.com/slundberg/shap, + my own pairing of colors
+        cp = sns.color_palette( ["#1E88E5", "#1e25e5", "#ff0d57", "#ff5a8c",  "#13B755", "#2de979","#7C52FF", "#b69fff", "#FFC000", "#ffd34d","#00AEEF", '#3dcaff'])
+        sns.set_palette(cp, color_codes = True, desat = desat)
     else:
-        sns.set_palette(palette, color_codes = True)
+        sns.set_palette(palette, color_codes = True, desat = desat)
 set_mpl()
 
 

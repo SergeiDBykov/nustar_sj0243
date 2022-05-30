@@ -686,7 +686,7 @@ class NustarObservation:
             error = pulse_profile["ERROR1"]
 
             ax_efold.errorbar(
-                phase, rate, error, drawstyle="steps-mid", ls="-", alpha=0.8, lw=3
+                phase, rate, error, drawstyle="steps-mid", ls="-", alpha=0.6, lw=3
             )
 
 
@@ -694,7 +694,7 @@ class NustarObservation:
             colors.append(color)
             for dph in [-2, -1, 0, 1, 2]:
                 ax_efold.fill_between(
-                    phase + dph, 0, rate, fc=color, alpha=0.4, ec="k", label=f"{binnum}"
+                    phase + dph, 0, rate, fc=color, alpha=0.2, ec="k", label=f"{binnum}"
                 )
                 
                 ax_efold.errorbar(
@@ -703,7 +703,7 @@ class NustarObservation:
                     error,
                     drawstyle="steps-mid",
                     ls="-",
-                    alpha=0.8,
+                    alpha=0.6,
                     lw=3,
                     ecolor=color,
                     color=color,
