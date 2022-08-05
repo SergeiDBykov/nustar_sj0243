@@ -2,7 +2,7 @@
 
 This are  scripts and notebooks which are used to run the pipeline for the **NuSTAR** X-ray observatory for the pulsar data. The emphasis  is on  the **phase-averaged** and **phase-resolved** products. 
 
-The data analysis is illustrated on the X-ray pulsar **Swift J0243.6+6124**, and  these results I used in my [paper]().
+The data analysis is illustrated on the X-ray pulsar **Swift J0243.6+6124**, and  these results I used in my paper [ULX pulsar Swift J0243.6+6124 observations with NuSTAR - dominance of reflected emission in the super-Eddington state]().
 
 Necessary soft/packages: `heasoft`, `ds9`, python:  `pyxspec, numpy, pandas, matplotlib, seaborn, astropy, tqdm`.
 
