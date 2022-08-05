@@ -2,7 +2,7 @@
 
 """ 
 storage.py from Pavel Medvedev (IKI, Moscow). 
-See email from 2medvedev@gmail.com from 20.05.2021
+2medvedev@gmail.com 
 """
 
 
