@@ -426,7 +426,7 @@ def scan_containers_ph_res(model_name:  str) -> pd.DataFrame:
         except ValueError:
             #print(f'failed to unpack {s._srcID[0]}')
             ObsID, binnum, _, model, detA = s._srcID[0].split('_')
-        #_, _, _, detB = s._srcID[1].split('_') #TODO remove this before publication 
+        #_, _, _, detB = s._srcID[1].split('_') #it was used when I tried shifting data's null phase by an integer of half-period. IT is not necessary anymore.  
         detB = 'FPMA'
 
         for df in [fpma, fpmb]:
@@ -587,7 +587,7 @@ def plot_ph_res_storage(df_ph_res: pd.DataFrame,  nu_obs: NustarObservation, pro
                                                save=False, legend=False, phase_zero_efold_file=nu_obs.products_path+'/phase_resolved/'+'phase_resolved_bin1AB_sr.lc_bary_nphase_128.efold')
     except:
                 _, colors = nu_obs.plot_efolds_of_bins(prodpath=prodpath_ph_res,        efolds_files=efolds, ax_efold=ax0, fig=fig,
-                                               save=False, legend=False, phase_zero_efold_file=nu_obs.products_path+'/phase_resolved/'+'phase_resolved_bin1AB_sr.lc_bary_orb_corr_nphase_128.efold') #TODO remove this before publication 
+                                               save=False, legend=False, phase_zero_efold_file=nu_obs.products_path+'/phase_resolved/'+'phase_resolved_bin1AB_sr.lc_bary_orb_corr_nphase_128.efold') #this is because for some time I had also files corrected for orbital motion. In the current state of the project it is not necessary
     plt.show()
 
     return fig

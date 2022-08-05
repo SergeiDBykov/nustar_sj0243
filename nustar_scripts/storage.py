@@ -280,7 +280,7 @@ class Storage(XSessionBase):
         if hasattr(item, 'srcID'):
             self.add_container(item)
         elif hasattr(item, '_srcID'):
-            raise NotImplementedError(5 * '*' + 'TODO' + 5 * '*')
+            raise NotImplementedError(5 * '*' + ' ' + 5 * '*')
             self.add_storage(item)
         else:
             raise TypeError(
@@ -297,7 +297,7 @@ class Storage(XSessionBase):
         """Get container from the storage."""
         if isinstance(key, slice):
             # idxes = [range(*key.indices(len(self)))]
-            raise NotImplementedError(5 * '*' + 'TODO' + 5 * '*')
+            raise NotImplementedError(5 * '*' + '' + 5 * '*')
         elif isinstance(key, int):
             # Since added Container objects are not stored in the storage, but
             # appended to the tables of _table_list, we need to make new Container
